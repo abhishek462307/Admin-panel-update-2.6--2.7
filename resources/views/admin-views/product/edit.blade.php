@@ -300,6 +300,25 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="col-sm-6 col-lg-3" id="brand_input">
+                                    <div class="form-group mb-0">
+                                        <label class="input-label" for="brand_id">{{ translate('messages.Brand') }}<span
+                                                class="input-label-secondary"></span></label>
+                                        <select name="brand_id" id="brand_id"
+                                            data-placeholder="{{ translate('messages.Select_brand') }}"
+                                            id="brand_id" class="js-data-example-ajax form-control"
+                                            oninvalid="this.setCustomValidity('{{ translate('messages.Select_brand') }}')">
+                                            @if (isset($product->ecommerce_item_details?->brand_id))
+                                                <option value="{{ $product->ecommerce_item_details->brand_id }}" selected="selected">
+                                                    {{ $product->ecommerce_item_details?->brand->name }}</option>
+                                            @elseif((isset($temp_product) && $temp_product == 1 && $product->brand_id))
+                                            <option value="{{ $product->brand_id }}" selected="selected">
+                                                {{ $product->brand->name }}</option>
+                                            @endif
+
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="col-sm-6 col-lg-3" id="unit_input">
                                     <div class="form-group mb-0">
                                         <label class="input-label text-capitalize"
@@ -355,6 +374,16 @@
                                         </label>
                                       </div>
                                 </div>
+                                @if(Config::get('module.current_module_type') == 'pharmacy')
+                                <div class="col-sm-6 col-lg-3" id="is_prescription_required">
+                                    <div class="form-check mb-0 p-6">
+                                        <input class="form-check-input" name="is_prescription_required" type="checkbox" value="1" id="flexCheckDefaultprescription" {{ $product->pharmacy_item_details?->is_prescription_required == 1?'checked':((isset($temp_product) && $temp_product == 1 && $product->is_prescription_required ==1)?'checked':'') }}>
+                                        <label class="form-check-label" for="flexCheckDefaultprescription">
+                                          {{ translate('messages.is_prescription_required') }}
+                                        </label>
+                                      </div>
+                                </div>
+                                @endif
                                 <div class="col-sm-6 col-lg-3" id="basic">
                                     <div class="form-check mb-0 p-6">
                                         <input class="form-check-input" name="basic" type="checkbox" value="1" id="flexCheckDefaultbasic" {{ $product->pharmacy_item_details?->is_basic == 1?'checked':((isset($temp_product) && $temp_product == 1 && $product->basic ==1)?'checked':'') }}>
@@ -363,6 +392,16 @@
                                         </label>
                                       </div>
                                 </div>
+                                @if(Config::get('module.current_module_type') == 'grocery' || Config::get('module.current_module_type') == 'food')
+                                    <div class="col-sm-6 col-lg-3" id="halal">
+                                        <div class="form-check mb-0 p-6">
+                                            <input class="form-check-input" name="is_halal" type="checkbox" value="1" id="flexCheckDefault1" {{ $product->is_halal == 1?'checked':((isset($temp_product) && $temp_product == 1 && $product->is_halal ==1)?'checked':'') }}>
+                                            <label class="form-check-label" for="flexCheckDefault1">
+                                                {{ translate('messages.Is_It_Halal') }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -708,14 +747,14 @@
          hide_min_max(data);
      });
 
-    let count = {{ isset($product->food_variations) ? count(json_decode($product->food_variations, true)) : 0 }};
+    let count =   $('.count_div').length;
 
     $(document).ready(function() {
         $("#add_new_option_button").click(function(e) {
             $('#empty-variation').hide();
             count++;
             let add_option_view = `
-                    <div class="__bg-F8F9FC-card view_new_option mb-2">
+                    <div class="__bg-F8F9FC-card count_div view_new_option mb-2">
                         <div>
                             <div class="d-flex align-items-center justify-content-between mb-3">
                                 <label class="form-check form--check">
@@ -837,19 +876,19 @@
     let countRow = 0;
 
     function add_new_row_button(data) {
-        count = data;
+        // count = data;
         countRow = 1 + $('#option_price_view_' + data).children('.add_new_view_row_class').length;
         let add_new_row_view = `
             <div class="row add_new_view_row_class mb-3 position-relative pt-3 pt-sm-0">
                 <div class="col-md-4 col-sm-5">
                         <label for="">{{ translate('Option_name') }}</label>
-                        <input class="form-control" required type="text" name="options[` + count + `][values][` +
+                        <input class="form-control" required type="text" name="options[` + data + `][values][` +
             countRow + `][label]" id="">
                     </div>
                     <div class="col-md-4 col-sm-5">
                         <label for="">{{ translate('Additional_price') }}</label>
                         <input class="form-control"  required type="number" min="0" step="0.01" name="options[` +
-            count +
+                        data +
             `][values][` + countRow + `][optionPrice]" id="">
                     </div>
                     <div class="col-sm-2 max-sm-absolute">
@@ -991,6 +1030,11 @@
         } else {
             $('#condition_input').hide();
         }
+        if (module_data.brand) {
+            $('#brand_input').show();
+        } else {
+            $('#brand_input').hide();
+        }
         if (module_type == 'food') {
             $('#food_variation_section').show();
             $('#attribute_section').hide();
@@ -1042,6 +1086,31 @@
     $('#condition_id').select2({
             ajax: {
                 url: '{{ url('/') }}/admin/common-condition/get-all',
+                data: function(params) {
+                    return {
+                        q: params.term, // search term
+                        page: params.page,
+                    };
+                },
+                processResults: function(data) {
+                    return {
+                        results: data
+                    };
+                },
+                __port: function(params, success, failure) {
+                    let $request = $.ajax(params);
+
+                    $request.then(success);
+                    $request.fail(failure);
+
+                    return $request;
+                }
+            }
+        });
+
+    $('#brand_id').select2({
+            ajax: {
+                url: '{{ url('/') }}/admin/brand/get-all',
                 data: function(params) {
                     return {
                         q: params.term, // search term

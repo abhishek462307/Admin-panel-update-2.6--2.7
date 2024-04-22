@@ -32,7 +32,9 @@ use App\CentralLogics\ProductLogic;
 use App\Mail\OrderVerificationMail;
 use App\CentralLogics\CustomerLogic;
 use App\Http\Controllers\Controller;
+use App\Models\CashBackHistory;
 use App\Models\OfflinePaymentMethod;
+use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use MatanYadaev\EloquentSpatial\Objects\Point;
@@ -447,7 +449,22 @@ class OrderController extends Controller
         }
         $order->dm_vehicle_id = $vehicle_id;
         $order->pending = now();
-        $order->order_attachment = $request->has('order_attachment') ? Helpers::upload('order/', 'png', $request->file('order_attachment')) : null;
+        if (!empty($request->file('order_attachment')) && is_array($request->file('order_attachment'))) {
+            $img_names = [];
+            $images = [];
+            if (!empty($request->file('order_attachment'))) {
+                foreach ($request->order_attachment as $img) {
+                    $image_name = Helpers::upload('order/', 'png', $img);
+                    array_push($img_names, $image_name);
+                }
+                $images = $img_names;
+            } else {
+                $images = null;
+            }
+            $order->order_attachment = json_encode($images);
+        }else{
+            $order->order_attachment = $request->has('order_attachment') ? Helpers::upload('order/', 'png', $request->file('order_attachment')) : null;
+        }
         $order->distance = $request->distance;
         $order->created_at = now();
         $order->updated_at = now();
@@ -469,6 +486,12 @@ class OrderController extends Controller
         } else {
             $order->additional_charge = 0;
         }
+
+        // extra packaging charge
+        $extra_packaging_data = BusinessSetting::where('key', 'extra_packaging_data')->first()?->value ?? '';
+        $extra_packaging_data =json_decode($extra_packaging_data , true);
+        $order->extra_packaging_amount =  (!empty($extra_packaging_data) && $request?->extra_packaging_amount > 0 && $store && ($extra_packaging_data[$store->module->module_type]=='1') && ($store?->storeConfig?->extra_packaging_status == '1'))?$store?->storeConfig?->extra_packaging_amount:0;
+
 
         $carts = Cart::where('user_id', $order->user_id)->where('is_guest',$order->is_guest)->where('module_id',$request->header('moduleId'))
         ->when(isset($request->is_buy_now) && $request->is_buy_now == 1 && $request->cart_id, function ($query) use ($request) {
@@ -602,6 +625,14 @@ class OrderController extends Controller
                             ], 403);
                         }
 
+                        if(($product->pharmacy_item_details?->is_prescription_required == '1') && empty($request->file('order_attachment'))){
+                            return response()->json([
+                                'errors' => [
+                                    ['code' => 'prescription', 'message' => translate('messages.prescription_is_required_for_this_order')]
+                                ]
+                            ], 403);
+                        }
+
 
                         if($product->maximum_cart_quantity && ($c['quantity'] > $product->maximum_cart_quantity)){
                             return response()->json([
@@ -728,7 +759,25 @@ class OrderController extends Controller
                 }
             }
             $coupon_discount_amount = $coupon ? CouponLogic::get_discount($coupon, $product_price + $total_addon_price - $store_discount_amount - $flash_sale_admin_discount_amount - $flash_sale_vendor_discount_amount) : 0;
+
+
+
+
             $total_price = $product_price + $total_addon_price - $store_discount_amount - $flash_sale_admin_discount_amount - $flash_sale_vendor_discount_amount  - $coupon_discount_amount;
+
+
+
+            if($order->is_guest  == 0 && $order->user_id ){
+                $user= User::withcount('orders')->find($order->user_id);
+                $discount_data= Helpers::getCusromerFirstOrderDiscount(order_count:$user->orders_count ,user_creation_date:$user->created_at,  refby:$user->ref_by, price: $total_price);
+                    if(data_get($discount_data,'is_valid') == true &&  data_get($discount_data,'calculated_amount') > 0){
+                        $total_price = $total_price - data_get($discount_data,'calculated_amount');
+                        $order->ref_bonus_amount = data_get($discount_data,'calculated_amount');
+                    }
+            }
+
+
+
 
             $tax = ($store->tax > 0) ? $store->tax : 0;
             $order->tax_status = 'excluded';
@@ -800,7 +849,7 @@ class OrderController extends Controller
         $order->flash_store_discount_amount = round($flash_sale_vendor_discount_amount, config('round_up_to_digit'));
 
         //DM TIPS
-        $order->order_amount = $order->order_amount + $order->dm_tips + $order->additional_charge;
+        $order->order_amount = $order->order_amount + $order->dm_tips + $order->additional_charge + $order->extra_packaging_amount;
         if ($request->payment_method == 'wallet' && $request->user->wallet_balance < $order->order_amount) {
             return response()->json([
                 'errors' => [
@@ -871,6 +920,10 @@ class OrderController extends Controller
                     OrderLogic::create_order_payment(order_id:$order->id, amount:$unpaid_amount, payment_status:'unpaid', payment_method:$request->payment_method);
                 }
             }
+            if($order->is_guest  == 0 && $order->user_id ){
+                $this->createCashBackHistory($order->order_amount, $order->user_id,$order->id);
+            }
+
             DB::commit();
 
 
@@ -899,47 +952,6 @@ class OrderController extends Controller
             } catch (\Exception $ex) {
                 info($ex->getMessage());
             }
-			
-			$whatsapp = DB::table('whatsapp_setting')->first();
-            $url = $whatsapp->url ?? '';
-            $instance_id = $whatsapp->instance_id ?? '';
-            $access_token = $whatsapp->access_token ?? '';
-            $message_type = $whatsapp->message_type ?? '';
-            $message_new_order = $whatsapp->message_new_order ?? '';
-            
-            $message = $message_new_order . "\n";
-            $message .= 'Order Id: ' . $order->id . "\n";
-            $message1 = urlencode($message);
-            //-------------------------admin--------------------------------------------------------------//
-            $admin = DB::table('business_settings')->where('key', 'phone')->first();
-            $admin_number = $admin->value ?? '';
-            $userphone=$admin_number;
-            $user1 = str_replace('+','',$userphone);
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url."?number=$user1&type=$message_type&message=$message1&instance_id=$instance_id&access_token=$access_token");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_exec($ch);
-            curl_close($ch);
-            //-------------------------admin end--------------------------------------------------------------//
-            $store = DB::table('stores')->where('id', $request->store_id)->first();
-            $store_number = $store->phone ?? '';
-            $userphone='91'.$store_number;
-            $user1 = str_replace('+','',$userphone);
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url."?number=$user1&type=$message_type&message=$message1&instance_id=$instance_id&access_token=$access_token");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_exec($ch);
-            curl_close($ch);
-            //-------------------------store end--------------------------------------------------------------//
-			
-			
-			
-			
-			
-			
-			
-			
-			
             //PlaceOrderMail end
             return response()->json([
                 'message' => translate('messages.order_placed_successfully'),
@@ -1272,6 +1284,18 @@ class OrderController extends Controller
         $coupon_discount_amount = $coupon ? CouponLogic::get_discount($coupon, $product_price + $total_addon_price - $store_discount_amount) : 0;
         $total_price = $product_price + $total_addon_price - $store_discount_amount - $coupon_discount_amount;
 
+
+        if($order->is_guest  == 0 && $order->user_id ){
+            $user= User::withcount('orders')->find($order->user_id);
+            $discount_data= Helpers::getCusromerFirstOrderDiscount(order_count:$user->orders_count ,user_creation_date:$user->created_at, refby:$user->ref_by, price:  $total_price);
+                if(data_get($discount_data,'is_valid') == true &&  data_get($discount_data,'calculated_amount') > 0){
+                    $total_price =  $total_price - data_get($discount_data,'calculated_amount');
+                    $order->ref_bonus_amount = data_get($discount_data,'calculated_amount');
+                }
+        }
+
+
+
         $tax = ($store->tax > 0) ? $store->tax : 0;
         $order->tax_status = 'excluded';
 
@@ -1316,6 +1340,12 @@ class OrderController extends Controller
         $order->total_tax_amount = round($total_tax_amount, config('round_up_to_digit'));
         $order->order_amount = round($total_price + $tax_a + $order->delivery_charge, config('round_up_to_digit'));
         $order->free_delivery_by = $free_delivery_by;
+
+
+
+
+
+
         $order->order_amount = $order->order_amount + $order->dm_tips + $order->additional_charge;
 
         try {
@@ -1326,6 +1356,10 @@ class OrderController extends Controller
             if($customer){
                 $customer->zone_id = $order->zone_id;
                 $customer->save();
+            }
+
+            if($order->is_guest  == 0 && $order->user_id ){
+                $this->createCashBackHistory($order->order_amount, $order->user_id,$order->id);
             }
             DB::commit();
             if($order->payment_method != 'digital_payment'){
@@ -1897,5 +1931,27 @@ class OrderController extends Controller
 		});
 
         return response()->json(Helpers::store_data_formatting($data, true), 200);
+    }
+
+
+    private function createCashBackHistory($order_amount, $user_id,$order_id){
+        $cashBack =  Helpers::getCalculatedCashBackAmount(amount:$order_amount, customer_id:$user_id);
+        if(data_get($cashBack,'calculated_amount') > 0){
+            $CashBackHistory = new CashBackHistory();
+            $CashBackHistory->user_id = $user_id;
+            $CashBackHistory->order_id = $order_id;
+            $CashBackHistory->calculated_amount = data_get($cashBack,'calculated_amount');
+            $CashBackHistory->cashback_amount = data_get($cashBack,'cashback_amount');
+            $CashBackHistory->cash_back_id = data_get($cashBack,'id');
+            $CashBackHistory->cashback_type = data_get($cashBack,'cashback_type');
+            $CashBackHistory->min_purchase = data_get($cashBack,'min_purchase');
+            $CashBackHistory->max_discount = data_get($cashBack,'max_discount');
+            $CashBackHistory->save();
+
+            $CashBackHistory?->order()->update([
+                'cash_back_id'=> $CashBackHistory->id
+            ]);
+        }
+        return true;
     }
 }

@@ -802,6 +802,13 @@ class VendorController extends Controller
                     ]);
                 }
 
+                if ( config('mail.status') && Helpers::get_mail_status('suspend_mail_status_store') == '1') {
+                    Mail::to( $vendor?->email)->send(new \App\Mail\VendorStatus('suspended', $vendor?->f_name.' '.$vendor?->l_name));
+                }
+            } else{
+                if ( config('mail.status') && Helpers::get_mail_status('unsuspend_mail_status_store') == '1') {
+                    Mail::to( $vendor?->email)->send(new \App\Mail\VendorStatus('unsuspended', $vendor?->f_name.' '.$vendor?->l_name));
+                }
             }
 
         }
@@ -834,6 +841,16 @@ class VendorController extends Controller
         }
         if($request->menu == "self_delivery_system" && $request->status == '0') {
             $store['free_delivery'] = 0;
+        }
+
+        if($request->menu == 'halal_tag_status' ){
+            $conf = StoreConfig::firstOrNew(
+                ['store_id' =>  $store->id]
+            );
+            $conf[$request->menu] = $request->status;
+            $conf->save();
+            Toastr::success(translate('messages.Store_settings_updated!'));
+            return back();
         }
 
         $store[$request->menu] = $request->status;

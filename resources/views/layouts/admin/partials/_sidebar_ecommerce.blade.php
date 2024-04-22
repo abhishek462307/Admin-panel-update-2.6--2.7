@@ -315,6 +315,15 @@
                 </li>
                 @endif
                 <!-- End Coupon -->
+
+                 {{-- @if (\App\CentralLogics\Helpers::module_permission_check('cashback')) --}}
+                 <li class="navbar-vertical-aside-has-menu {{ Request::is('admin/cashback*') ? 'active' : '' }}">
+                    <a class="js-navbar-vertical-aside-menu-link nav-link" href="{{ route('admin.cashback.add-new') }}" title="{{ translate('messages.cashback') }}">
+                        <i class="tio-settings-back nav-icon"></i>
+                        <span class="navbar-vertical-aside-mini-mode-hidden-elements text-truncate">{{ translate('messages.cashback') }}</span>
+                    </a>
+                </li>
+                {{-- @endif --}}
                 <!-- Notification -->
                 @if (\App\CentralLogics\Helpers::module_permission_check('notification'))
                 <li class="navbar-vertical-aside-has-menu {{ Request::is('admin/notification*') ? 'active' : '' }}">
@@ -399,6 +408,15 @@
                 </li>
                 @endif
                 <!-- End Unit -->
+
+                <li class="navbar-vertical-aside-has-menu {{ Request::is('admin/brand*') ? 'active' : '' }}">
+                    <a class="js-navbar-vertical-aside-menu-link nav-link" href="{{ route('admin.brand.add') }}" title="{{ translate('messages.Brands') }}">
+                        <i class="tio-medal nav-icon"></i>
+                        <span class="navbar-vertical-aside-mini-mode-hidden-elements text-truncate text-capitalize">
+                        {{ translate('messages.Brands') }}
+                    </span>
+                    </a>
+                </li>
 
 
                 <!-- End AddOn -->

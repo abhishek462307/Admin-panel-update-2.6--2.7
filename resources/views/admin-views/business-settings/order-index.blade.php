@@ -242,6 +242,32 @@
                                             </div>
                                         </div>
                                     </div>
+                                    @php($extra_packaging_data = \App\Models\BusinessSetting::where('key', 'extra_packaging_data')->first()?->value ?? '')
+                                    @php($extra_packaging_data =json_decode($extra_packaging_data , true))
+                                    <div class="mt-4  mb-4 access_product_approval">
+
+                                        <label class="mb-2 input-label text-capitalize d-flex alig-items-center" for=""> <img src="{{ asset('/public/assets/admin/img/icon-park_ad-product.png') }}" alt=""
+                                            class="card-header-icon align-self-center mr-1">{{ translate('Enable Extra Packaging Charge') }}
+
+                                            <span class="form-label-secondary text-danger"
+                                            data-toggle="tooltip" data-placement="right"
+                                            data-original-title="{{ translate('messages.After_saving_information,_sellers_will_get_the_option_to_offer_extra_packaging_charge_to_the_customer') }}"><img
+                                                src="{{ asset('/public/assets/admin/img/info-circle.svg') }}"
+                                                alt="{{ translate('Extra_Packaging_Charge') }}"></span>
+
+                                        </label>
+                                        <div class="justify-content-between border form-control">
+                                            @foreach (config('module.module_type') as $key => $value)
+                                            @if ($value != 'parcel')
+                                            <div class="form-check form-check-inline mx-4  ">
+                                                <input class="mx-2 form-check-input" type="checkbox" {{  data_get($extra_packaging_data,$value,null) == 1 ? 'checked' :'' }} id="inlineCheckbox{{$key}}" value="1" name="{{ $value }}">
+                                                <label class=" form-check-label" for="inlineCheckbox{{$key}}">{{ translate($value) }}</label>
+                                            </div>
+                                            @endif
+                                            @endforeach
+
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="btn--container justify-content-end mt-3">
                                     <button type="reset" class="btn btn--reset">{{ translate('messages.reset') }}</button>

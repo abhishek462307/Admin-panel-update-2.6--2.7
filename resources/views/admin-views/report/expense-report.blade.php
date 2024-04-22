@@ -78,7 +78,7 @@
                             </select>
                         </div>
                         <div class="col-sm-6 col-md-3">
-                            <select class="form-control set-filter" data-url="{{ url()->full() }}" data-filter="type" name="type">
+                            <select class="form-control js-select2-custom set-filter" data-url="{{ url()->full() }}" data-filter="type" name="type">
                                 <option value="all" {{ isset($type) && $type == 'all' ? 'selected' : '' }}>
                                     {{ translate('messages.All Type') }}</option>
                                 <option value="add_fund_bonus" {{ isset($type) && $type == 'add_fund_bonus' ? 'selected' : '' }}>
@@ -91,10 +91,14 @@
                                     {{ translate('messages.discount_on_product') }}</option>
                                 <option value="flash_sale_discount" {{ isset($type) && $type == 'flash_sale_discount' ? 'selected' : '' }}>
                                     {{ translate('messages.flash_sale_discount') }}</option>
+                                <option value="CashBack" {{ isset($type) && $type == 'CashBack' ? 'selected' : '' }}>
+                                    {{ translate('messages.CashBack') }}</option>
+                                <option value="referral_discount" {{ isset($type) && $type == 'referral_discount' ? 'selected' : '' }}>
+                                    {{ translate('messages.Referral_Discount') }}</option>
                             </select>
                         </div>
                         <div class="col-sm-6 col-md-3">
-                            <select class="form-control set-filter" data-url="{{ url()->full() }}" data-filter="filter" name="filter">
+                            <select class="form-control js-select2-custom set-filter" data-url="{{ url()->full() }}" data-filter="filter" name="filter">
                                 <option value="all_time" {{ isset($filter) && $filter == 'all_time' ? 'selected' : '' }}>
                                     {{ translate('messages.All Time') }}</option>
                                 <option value="this_year" {{ isset($filter) && $filter == 'this_year' ? 'selected' : '' }}>

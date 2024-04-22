@@ -412,6 +412,11 @@ Route::group(['namespace' => 'Api\V1', 'middleware'=>'localization'], function (
             Route::get('items/{condition_id}', 'CommonConditionController@get_products');
         });
 
+        Route::group(['prefix' => 'brand'], function () {
+            Route::get('/', 'BrandController@get_brands');
+            Route::get('items/{brand_id}', 'BrandController@get_products');
+        });
+
         Route::group(['prefix' => 'campaigns'], function () {
             Route::get('basic', 'CampaignController@get_basic_campaigns');
             Route::get('basic-campaign-details', 'CampaignController@basic_campaign_details');
@@ -426,6 +431,10 @@ Route::group(['namespace' => 'Api\V1', 'middleware'=>'localization'], function (
         Route::get('coupon/list', 'CouponController@list');
         Route::group(['prefix' => 'coupon', 'middleware' => 'auth:api'], function () {
             Route::get('apply', 'CouponController@apply');
+        });
+        Route::get('cashback/list', 'CashBackController@list');
+        Route::group(['prefix' => 'cashback', 'middleware' => 'auth:api'], function () {
+            Route::get('getCashback', 'CashBackController@getCashback');
         });
 
         Route::get('parcel-category','ParcelCategoryController@index');

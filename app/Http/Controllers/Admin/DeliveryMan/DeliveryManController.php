@@ -205,15 +205,16 @@ class DeliveryManController extends BaseController
                 else{
                     Toastr::warning(translate('messages.push_notification_failed'));
                 }
-                try {
-                    $mail_status = getWebConfigStatus('suspend_mail_status_dm');
-                    if (config('mail.status') && $mail_status == '1') {
-                        Mail::to($deliveryMan['email'])->send(new DmSuspendMail($deliveryMan['f_name']));
-                    }
-                }  catch (Exception) {
-                    Toastr::warning(translate('messages.failed_to_send_mail'));
+            }
+            try {
+                if (config('mail.status') && getWebConfigStatus('suspend_mail_status_dm') == '1' &&  $request['status'] == 0) {
+                    Mail::to($deliveryMan['email'])->send(new DmSuspendMail('suspend',$deliveryMan['f_name']));
                 }
-
+                elseif(config('mail.status') && getWebConfigStatus('unsuspend_mail_status_dm') == '1' &&  $request['status'] != 0){
+                    Mail::to($deliveryMan['email'])->send(new DmSuspendMail('unsuspend',$deliveryMan['f_name']));
+                }
+            }  catch (Exception) {
+                Toastr::warning(translate('messages.failed_to_send_mail'));
             }
 
         Toastr::success(translate('messages.deliveryman_status_updated'));

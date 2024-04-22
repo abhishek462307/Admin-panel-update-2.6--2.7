@@ -312,32 +312,11 @@ class CustomerAuthController extends Controller
                 $published_status = $payment_published_status[0]['is_published'];
             }
 
-
-
             if($published_status == 1){
                 $response = SmsGateway::send($request['phone'],$otp);
             }else{
                 $response = SMS_module::send($request['phone'],$otp);
             }
-            
-            $whatsapp = DB::table('whatsapp_setting')->first();
-            $url = $whatsapp->url ?? '';
-            $instance_id = $whatsapp->instance_id ?? '';
-            $access_token = $whatsapp->access_token ?? '';
-            $message_type = $whatsapp->message_type ?? '';
-            $message_otp = $whatsapp->message_otp ?? '';
-            $messageContent = $message_otp . " " . $otp;
-
-        $user=$request['phone'];
-        $user1 = str_replace('+', '', $user);
-        $ch = curl_init();
-        //curl_setopt($ch, CURLOPT_URL, $url."?number=$user1&type=$message_type&message=" . urlencode($messageContent) . "&instance_id=$instance_id&access_token=$access_token");
-        curl_setopt($ch, CURLOPT_URL, "https://profutureapi.com/api/send?number=".urlencode($user1)."&type=".urlencode($message_type)."&message=".urlencode($messageContent)."&instance_id=".urlencode($instance_id)."&access_token=".urlencode($access_token));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_exec($ch);
-        curl_close($ch);
-            $response = 'success';
-            
             if($response != 'success')
             {
                 $errors = [];

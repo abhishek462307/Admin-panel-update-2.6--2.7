@@ -15,6 +15,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use App\Models\PharmacyItemDetails;
 use App\Http\Controllers\Controller;
+use App\Models\EcommerceItemDetails;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -232,6 +233,7 @@ class ItemController extends Controller
         $item->images = $images;
         $item->unit_id = $request->unit;
         $item->organic = $request->organic??0;
+        $item->is_halal =  $request->is_halal ?? 0;
         $item->save();
         $item->tags()->sync($tag_ids);
 
@@ -241,6 +243,14 @@ class ItemController extends Controller
             $item_details->item_id = $item->id;
             $item_details->common_condition_id = $request->condition_id;
             $item_details->is_basic = $request->basic ?? 0;
+            $item_details->is_prescription_required = $request->is_prescription_required ?? 0;
+            $item_details->save();
+        }
+
+        if ($request['vendor']->stores[0]->module->module_type == 'ecommerce') {
+            $item_details = new EcommerceItemDetails();
+            $item_details->item_id = $item->id;
+            $item_details->brand_id = $request->brand_id;
             $item_details->save();
         }
 
@@ -512,8 +522,7 @@ class ItemController extends Controller
         $p->images = array_values($images);
         $p->unit_id = $request->unit;
         $p->organic = $request->organic??0;
-
-
+        $p->is_halal =  $request->is_halal ?? 0;
 
         $product_approval_datas = \App\Models\BusinessSetting::where('key', 'product_approval_datas')->first()?->value ?? '';
         $product_approval_datas =json_decode($product_approval_datas , true);
@@ -533,6 +542,17 @@ class ItemController extends Controller
                     [
                         'common_condition_id' => $request->condition_id,
                         'is_basic' => $request->basic ?? 0,
+                        'is_prescription_required' => $request->is_prescription_required ?? 0,
+                    ]
+                );
+        }
+
+        if($request['vendor']->stores[0]->module->module_type == 'ecommerce'){
+            DB::table('ecommerce_item_details')
+                ->updateOrInsert(
+                    ['item_id' => $p->id],
+                    [
+                        'brand_id' => $request->brand_id,
                     ]
                 );
         }
@@ -767,6 +787,9 @@ class ItemController extends Controller
         $item->organic = $data->organic ?? 0;
         $item->stock =  $data->stock ?? 0;
         $item->common_condition_id =  $request->condition_id ?? 0;
+        $item->brand_id =  $request->brand_id ?? 0;
+        $item->is_halal =  $request->is_halal ?? 0;
+        $item->is_prescription_required =  $request->is_prescription_required ?? 0;
         $item->basic =  $request->basic ?? 0;
 
 
@@ -782,7 +805,17 @@ class ItemController extends Controller
                     [
                         'common_condition_id' => $request->condition_id,
                         'is_basic' => $request->basic ?? 0,
+                        'is_prescription_required' => $request->is_prescription_required ?? 0,
                         'item_id' => null
+                    ]
+                );
+        }
+        if($request['vendor']->stores[0]->module->module_type == 'ecommerce'){
+            DB::table('ecommerce_item_details')
+                ->updateOrInsert(
+                    ['item_id' => $item->id],
+                    [
+                        'brand_id' => $request->brand_id,
                     ]
                 );
         }

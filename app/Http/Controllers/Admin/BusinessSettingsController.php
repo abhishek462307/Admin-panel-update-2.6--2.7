@@ -52,6 +52,7 @@ class BusinessSettingsController extends Controller
                 ->orWhere('key', 'like', 'ref_earning_%')
                 ->orWhere('key', 'like', 'add_fund_status%')
                 ->orWhere('key', 'like', 'customer_%')
+                ->orWhere('key', 'like', 'new_customer_discount_%')
                 ->orWhere('key', 'like', 'ref_earning_%')->get();
             $data = array_column($data->toArray(), 'value', 'key');
             return view('admin-views.business-settings.customer-index', compact('data'));
@@ -240,6 +241,15 @@ class BusinessSettingsController extends Controller
         ]);
         BusinessSetting::updateOrInsert(['key' => 'schedule_order_slot_duration_time_format'], [
             'value' => $request['schedule_order_slot_duration_time_format']
+        ]);
+
+        $values=[];
+        foreach (config('module.module_type') as $key => $value){
+            $values[$value] = $request[$value] ?? 0;
+        }
+
+        DB::table('business_settings')->updateOrInsert(['key' => 'extra_packaging_data'], [
+            'value' => json_encode($values)
         ]);
 
         Toastr::success(translate('messages.successfully_updated_to_changes_restart_app'));
@@ -5807,6 +5817,10 @@ class BusinessSettingsController extends Controller
             return view('admin-views.business-settings.email-format-setting.'.$type.'-email-formats.offline-approved-format',compact('template'));
         } else if ($tab == 'offline-payment-deny') {
             return view('admin-views.business-settings.email-format-setting.'.$type.'-email-formats.offline-deny-format',compact('template'));
+        } else if ($tab == 'pos-registration') {
+            return view('admin-views.business-settings.email-format-setting.'.$type.'-email-formats.pos-registration-format',compact('template'));
+        } else if ($tab == 'unsuspend') {
+            return view('admin-views.business-settings.email-format-setting.'.$type.'-email-formats.unsuspend-format',compact('template'));
         }
 
     }
@@ -5900,6 +5914,12 @@ class BusinessSettingsController extends Controller
         }elseif($tab == 'offline-payment-approve'){
             $email_type = 'offline_payment_approve';
             $template = EmailTemplate::where('type',$type)->where('email_type', 'offline_payment_approve')->first();
+        }elseif($tab == 'pos-registration'){
+            $email_type = 'pos_registration';
+            $template = EmailTemplate::where('type',$type)->where('email_type', 'pos_registration')->first();
+        }elseif($tab == 'unsuspend'){
+            $email_type = 'unsuspend';
+            $template = EmailTemplate::where('type',$type)->where('email_type', 'unsuspend')->first();
         }
 
         if ($template == null) {
@@ -5911,6 +5931,7 @@ class BusinessSettingsController extends Controller
         }
         $template->title = $request->title[array_search('default', $request->lang)];
         $template->body = $request->body[array_search('default', $request->lang)];
+        $template->body_2 = $request?->body_2 ? $request->body_2[array_search('default', $request->lang)] : null;
         $template->button_name = $request->button_name?$request->button_name[array_search('default', $request->lang)]:'';
         $template->footer_text = $request->footer_text[array_search('default', $request->lang)];
         $template->copyright_text = $request->copyright_text[array_search('default', $request->lang)];
@@ -5982,6 +6003,32 @@ class BusinessSettingsController extends Controller
                             'key'                   => 'body'
                         ],
                         ['value'                 => $request->body[$index]]
+                    );
+                }
+            }
+            if ($request?->body_2 && $default_lang == $key && !($request->body_2[$index])) {
+                if ($key != 'default') {
+                    Translation::updateOrInsert(
+                        [
+                            'translationable_type'  => 'App\Models\EmailTemplate',
+                            'translationable_id'    => $template->id,
+                            'locale'                => $key,
+                            'key'                   => 'body_2'
+                        ],
+                        ['value'                 => $template->body_2]
+                    );
+                }
+            } else {
+
+                if ($request?->body_2 && $request->body_2[$index] && $key != 'default') {
+                    Translation::updateOrInsert(
+                        [
+                            'translationable_type'  => 'App\Models\EmailTemplate',
+                            'translationable_id'    => $template->id,
+                            'locale'                => $key,
+                            'key'                   => 'body_2'
+                        ],
+                        ['value'                 => $request->body_2[$index]]
                     );
                 }
             }
@@ -6186,7 +6233,15 @@ class BusinessSettingsController extends Controller
             DB::table('business_settings')->updateOrInsert(['key' => 'offline_payment_approve_mail_status_'.$type], [
                 'value' => $status
             ]);
-        }
+        } else if ($tab == 'pos-registration') {
+            DB::table('business_settings')->updateOrInsert(['key' => 'pos_registration_mail_status_'.$type], [
+                'value' => $status
+            ]);
+        } else if ($tab == 'unsuspend') {
+            BusinessSetting::query()->updateOrInsert(['key' => 'unsuspend_mail_status_'.$type], [
+                'value' => $status
+            ]);
+        } 
 
         Toastr::success(translate('messages.email_status_updated'));
         return back();
@@ -6453,6 +6508,16 @@ class BusinessSettingsController extends Controller
                         [
                             'common_condition_id' => $data->condition_id,
                             'is_basic' => $data->basic ?? 0,
+                            'is_prescription_required' => $data->is_prescription_required ?? 0,
+                        ]
+                    );
+            }
+            if($item->module->module_type == 'ecommerce'){
+                DB::table('ecommerce_item_details')
+                    ->updateOrInsert(
+                        ['item_id' => $item->id],
+                        [
+                            'brand_id' => $data->brand_id,
                         ]
                     );
             }

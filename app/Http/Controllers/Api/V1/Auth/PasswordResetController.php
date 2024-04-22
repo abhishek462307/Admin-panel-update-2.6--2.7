@@ -76,23 +76,6 @@ class PasswordResetController extends Controller
             }else{
                 $response = SMS_module::send($request['phone'],$token);
             }
-    
-            $whatsapp = DB::table('whatsapp_setting')->first();
-            $url = $whatsapp->url ?? '';
-            $instance_id = $whatsapp->instance_id ?? '';
-            $access_token = $whatsapp->access_token ?? '';
-            $message_type = $whatsapp->message_type ?? '';
-            $message_otp = $whatsapp->message_otp ?? '';
-            $messageContent = $message_otp . " " . $token;
-            
-            $user=$request['phone'];
-            $user1 = str_replace('+', '', $user);
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url."?number=".urlencode($user1)."&type=".urlencode($message_type)."&message=".urlencode($messageContent)."&instance_id=".urlencode($instance_id)."&access_token=".urlencode($access_token));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_exec($ch);
-            curl_close($ch);
-    
             if($response == 'success')
             {
                 return response()->json(['message' => translate('messages.otp_sent_successfull')], 200);

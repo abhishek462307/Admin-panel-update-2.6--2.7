@@ -153,7 +153,7 @@
 
                                 @if (  !$parcel_order &&  !$editing && in_array($order->order_status, ['pending', 'confirmed', 'processing', 'accepted']) &&
                                         isset($order->store) &&
-                                        $order->prescription_order == 0 && count($order?->payments) == 0 && $order?->flash_admin_discount_amount == 0 && ($order->payment_method == 'cash_on_delivery'))
+                                        $order->prescription_order == 0 && count($order?->payments) == 0 && $order?->ref_bonus_amount == 0 && $order?->flash_admin_discount_amount == 0 && ($order->payment_method == 'cash_on_delivery'))
                                     <button class="btn btn-sm btn--danger btn-outline-danger font-regular edit-order" type="button">
                                         <i class="tio-edit"></i> {{ translate('messages.edit') }}
                                     </button>
@@ -282,10 +282,10 @@
                                 </h6>
                                 @endif
                                 @if ($order->order_attachment)
-                                    @if ($order->prescription_order)
                                         @php
                                             $order_images = json_decode($order->order_attachment);
                                         @endphp
+                                    @if (is_array($order_images))
                                         <h5 class="text-dark">
                                             <span>{{ translate('messages.prescription') }}</span> <span>:</span>
                                         </h5>
@@ -439,6 +439,8 @@
                             $product_price = 0;
                             $store_discount_amount = 0;
                             $admin_flash_discount_amount = $order['flash_admin_discount_amount'];
+                            $ref_bonus_amount = $order['ref_bonus_amount'];
+                            $extra_packaging_amount = $order['extra_packaging_amount'];
                             $store_flash_discount_amount = $order['flash_store_discount_amount'];
                             $del_c = $order['delivery_charge'];
                             $additional_charge = $order['additional_charge'];
@@ -495,6 +497,8 @@
                             }
                             $store_discount_amount = 0;
                             $admin_flash_discount_amount = $order['flash_admin_discount_amount'];
+                            $ref_bonus_amount = $order['ref_bonus_amount'];
+                            $extra_packaging_amount = $order['extra_packaging_amount'];
                             $store_flash_discount_amount = $order['flash_store_discount_amount'];
                             $additional_charge = $order['additional_charge'];
                             $del_c = $order['delivery_charge'];
@@ -811,7 +815,7 @@
                             <?php
                             $coupon_discount_amount = $order['coupon_discount_amount'];
 
-                            $total_price = $product_price + $total_addon_price - $store_discount_amount - $coupon_discount_amount - $admin_flash_discount_amount - $store_flash_discount_amount;
+                            $total_price = $product_price + $total_addon_price - $store_discount_amount - $coupon_discount_amount - $admin_flash_discount_amount - $ref_bonus_amount - $store_flash_discount_amount - $extra_packaging_amount;
 
                             $total_tax_amount = $order['total_tax_amount'];
                             if($order->tax_status == 'included'){
@@ -893,12 +897,21 @@
                                         </dd>
                                         <dt class="col-6">{{ translate('messages.discount') }}:</dt>
                                         <dd class="col-6">
-                                            - {{ \App\CentralLogics\Helpers::format_currency($store_discount_amount + $admin_flash_discount_amount + $store_flash_discount_amount) }}
+                                            - {{ \App\CentralLogics\Helpers::format_currency($store_discount_amount + $admin_flash_discount_amount  + $store_flash_discount_amount) }}
                                         </dd>
+
+
+
                                         <dt class="col-6">{{ translate('messages.coupon_discount') }}:</dt>
                                         <dd class="col-6">
                                             - {{ \App\CentralLogics\Helpers::format_currency($coupon_discount_amount) }}
                                         </dd>
+                                        @if ($ref_bonus_amount > 0)
+                                        <dt class="col-6">{{ translate('messages.Referral_Discount') }}:</dt>
+                                        <dd class="col-6">
+                                            - {{ \App\CentralLogics\Helpers::format_currency($ref_bonus_amount) }}
+                                        </dd>
+                                        @endif
                                         @if ($order->tax_status == 'excluded' || $order->tax_status == null  )
                                         {{-- @php($tax_a=0) --}}
                                         <dt class="col-6">{{ translate('messages.vat/tax') }}:</dt>
@@ -918,12 +931,21 @@
                                     <dd class="col-6">
                                         + {{ \App\CentralLogics\Helpers::format_currency($deliverman_tips) }}</dd>
                                     <dt class="col-6">{{ \App\CentralLogics\Helpers::get_business_data('additional_charge_name')??\App\CentralLogics\Helpers::get_business_data('additional_charge_name')??translate('messages.additional_charge') }}</dt>
+
                                     <dd class="col-6">
                                         + {{ \App\CentralLogics\Helpers::format_currency($additional_charge) }}</dd>
+
+                                        @if ($extra_packaging_amount > 0)
+                                        <dt class="col-6">{{ translate('messages.Extra_Packaging_Amount') }}:</dt>
+                                        <dd class="col-6">
+                                            + {{ \App\CentralLogics\Helpers::format_currency($extra_packaging_amount) }}
+                                        </dd>
+                                        @endif
+
                                     <dt class="col-6">{{ translate('messages.total') }}:</dt>
                                     <dd class="col-6">
 
-                                        {{ \App\CentralLogics\Helpers::format_currency($product_price + $del_c + $total_tax_amount + $total_addon_price + $deliverman_tips + $additional_charge - $coupon_discount_amount - $store_discount_amount - $admin_flash_discount_amount - $store_flash_discount_amount) }}
+                                        {{ \App\CentralLogics\Helpers::format_currency($product_price + $del_c + $total_tax_amount + $total_addon_price + $deliverman_tips + $additional_charge - $coupon_discount_amount - $store_discount_amount - $admin_flash_discount_amount - $store_flash_discount_amount - $ref_bonus_amount +$extra_packaging_amount )  }}
                                     </dd>
                                     @if ($order?->payments)
                                         @foreach ($order?->payments as $payment)

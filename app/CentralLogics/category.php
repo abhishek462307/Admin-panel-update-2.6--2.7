@@ -50,9 +50,10 @@ class CategoryLogic
         ];
     }
 
-    public static function category_products($category_ids, $zone_id, int $limit,int $offset, $type, $filter=null, $min=false, $max=false, $rating_count=null)
+    public static function category_products($category_ids, $zone_id, int $limit,int $offset, $type, $filter=null, $min=false, $max=false, $rating_count=null, $brand_ids = null)
     {
-        $category_ids = isset($category_ids)?(is_array($category_ids)?$category_ids:json_decode($category_ids)):'';
+        $category_ids = isset($category_ids)?(is_array($category_ids)?$category_ids:json_decode($category_ids)):[];
+        $brand_ids = isset($brand_ids)?(is_array($brand_ids)?$brand_ids:json_decode($brand_ids)):[];
         $filter = $filter?(is_array($filter)?$filter:str_getcsv(trim($filter, "[]"), ',')):'';
         $paginator = Item::
         whereHas('module.zones', function($query)use($zone_id){
@@ -65,8 +66,17 @@ class CategoryLogic
                     });
                 });
             })
-            ->whereHas('category',function($q)use($category_ids){
-                return $q->whereIn('id',$category_ids)->orWhereIn('parent_id', $category_ids);
+            ->when(isset($category_ids) && (count($category_ids)>0), function($query)use($category_ids){
+                $query->whereHas('category',function($q)use($category_ids){
+                    return $q->whereIn('id',$category_ids)->orWhereIn('parent_id', $category_ids);
+                });
+            })
+            ->when(isset($brand_ids) && (count($brand_ids)>0), function($query)use($brand_ids){
+                $query->whereHas('ecommerce_item_details',function($q)use($brand_ids){
+                    return $q->whereHas('brand',function($q)use($brand_ids){
+                        return $q->whereIn('id',$brand_ids);
+                    });
+                });
             })
             ->active()->type($type)
             ->when($rating_count, function($query) use ($rating_count){
@@ -74,6 +84,9 @@ class CategoryLogic
             })
             ->when($min && $max, function($query)use($min,$max){
                 $query->whereBetween('price',[$min,$max]);
+            })
+            ->when($filter&&in_array('top_rated',$filter),function ($qurey){
+                $qurey->withCount('reviews')->orderBy('reviews_count','desc');
             })
             ->when($filter&&in_array('popular',$filter),function ($qurey){
                 $qurey->popular();
@@ -83,9 +96,6 @@ class CategoryLogic
             })
             ->when($filter&&in_array('low',$filter),function ($qurey){
                 $qurey->orderBy('price', 'asc');
-            })
-            ->when($filter&&in_array('top_rated',$filter),function ($qurey){
-                $qurey->withCount('reviews')->orderBy('reviews_count','desc');
             })
             ->when($filter&&in_array('discounted',$filter),function ($qurey){
                 $qurey->Discounted()->orderBy('discount','desc');
@@ -104,8 +114,17 @@ class CategoryLogic
                         });
                     });
                 })
-                ->whereHas('category',function($q)use($category_ids){
-                    return $q->whereIn('id',$category_ids)->orWhereIn('parent_id', $category_ids);
+                ->when(isset($category_ids) && (count($category_ids)>0), function($query)use($category_ids){
+                    $query->whereHas('category',function($q)use($category_ids){
+                        return $q->whereIn('id',$category_ids)->orWhereIn('parent_id', $category_ids);
+                    });
+                })
+                ->when(isset($brand_ids) && (count($brand_ids)>0), function($query)use($brand_ids){
+                    $query->whereHas('ecommerce_item_details',function($q)use($brand_ids){
+                        return $q->whereHas('brand',function($q)use($brand_ids){
+                            return $q->whereIn('id',$brand_ids);
+                        });
+                    });
                 })
                 ->active()->type($type)
                 ->when($rating_count, function($query) use ($rating_count){
@@ -156,7 +175,7 @@ class CategoryLogic
 
     public static function category_stores($category_ids, $zone_id, int $limit,int $offset, $type,$longitude=0,$latitude=0,$filter=null,$rating_count=null)
     {
-        $category_ids = isset($category_ids)?(is_array($category_ids)?$category_ids:json_decode($category_ids)):'';
+        $category_ids = isset($category_ids)?(is_array($category_ids)?$category_ids:json_decode($category_ids)):[];
         $paginator = Store::
         withOpen($longitude??0,$latitude??0)
             ->withCount(['items','campaigns'])

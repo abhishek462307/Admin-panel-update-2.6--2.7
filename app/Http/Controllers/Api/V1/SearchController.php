@@ -37,9 +37,11 @@ class SearchController extends Controller
         $limit = $request['limit']??10;
         $offset = $request['offset']??1;
         $category_ids = $request['category_ids']?(is_array($request['category_ids'])?$request['category_ids']:json_decode($request['category_ids'])):'';
+        $brand_ids = $request['brand_ids']?(is_array($request['brand_ids'])?$request['brand_ids']:json_decode($request['brand_ids'])):'';
         $filter = $request['filter']?(is_array($request['filter'])?$request['filter']:str_getcsv(trim($request['filter'], "[]"), ',')):'';
         $type = $request->query('type', 'all');
         $min = $request->query('min_price');
+        $min = ($min == 0) ? 0.0001 : $min;
         $max = $request->query('max_price');
         $rating_count = $request->query('rating_count');
 
@@ -59,6 +61,13 @@ class SearchController extends Controller
         ->when($category_ids && (count($category_ids)>0), function($query)use($category_ids){
             $query->whereHas('category',function($q)use($category_ids){
                 return $q->whereIn('id',$category_ids)->orWhereIn('parent_id', $category_ids);
+            });
+        })
+        ->when(isset($brand_ids) && (count($brand_ids)>0), function($query)use($brand_ids){
+            $query->whereHas('ecommerce_item_details',function($q)use($brand_ids){
+                return $q->whereHas('brand',function($q)use($brand_ids){
+                    return $q->whereIn('id',$brand_ids);
+                });
             });
         })
         ->when($request->store_id, function($query) use($request){
@@ -147,6 +156,13 @@ class SearchController extends Controller
         ->when($category_ids && (count($category_ids)>0), function($query)use($category_ids){
             $query->whereHas('category',function($q)use($category_ids){
                 return $q->whereIn('id',$category_ids)->orWhereIn('parent_id', $category_ids);
+            });
+        })
+        ->when(isset($brand_ids) && (count($brand_ids)>0), function($query)use($brand_ids){
+            $query->whereHas('ecommerce_item_details',function($q)use($brand_ids){
+                return $q->whereHas('brand',function($q)use($brand_ids){
+                    return $q->whereIn('id',$brand_ids);
+                });
             });
         })
         ->when($request->store_id, function($query) use($request){
@@ -250,11 +266,13 @@ class SearchController extends Controller
             $filter = $request->query('filter', '');
             $filter = $filter?(is_array($filter)?$filter:str_getcsv(trim($filter, "[]"), ',')):'';
             $category_ids = $request->query('category_ids', '');
+            $brand_ids = $request->query('brand_ids', '');
 
             // Common parameters for all product types
             $limit = $request->query('limit', 10);
             $offset = $request->query('offset', 1);
             $min_price = $request->query('min_price');
+            $min_price = ($min_price == 0) ? 0.0001 : $min_price;
             $max_price = $request->query('max_price');
             $rating_count = $request->query('rating_count');
             $product_id = $request->query('product_id');
@@ -264,10 +282,20 @@ class SearchController extends Controller
                     return $this->get_searched_products($request);
                     break;
                 case 'discounted':
-                    $items = ProductLogic::discounted_products($zone_id, $limit, $offset, $type, $category_ids, $filter, $min_price, $max_price, $rating_count);
+                    $items = ProductLogic::discounted_products($zone_id, $limit, $offset, $type, $category_ids, $filter, $min_price, $max_price, $rating_count,$brand_ids);
+                    break;
+                case 'brand':
+                    $validator = Validator::make($request->all(), [
+                        'brand_ids' => 'required',
+                    ]);
+
+                    if ($validator->fails()) {
+                        return response()->json(['errors' => Helpers::error_processor($validator)], 403);
+                    }
+                    $items = ProductLogic::brand_products($zone_id, $limit, $offset, $type, $category_ids, $filter, $min_price, $max_price, $rating_count,$brand_ids);
                     break;
                 case 'new':
-                    $items = ProductLogic::get_new_products($zone_id, $type, $min_price, $max_price, $product_id, $limit, $offset, $filter, $rating_count);
+                    $items = ProductLogic::get_new_products($zone_id, $type, $min_price, $max_price, $product_id, $limit, $offset, $filter, $rating_count, $category_ids,$brand_ids);
                     break;
                 case 'category':
                     $validator = Validator::make($request->all(), [
@@ -278,7 +306,7 @@ class SearchController extends Controller
                         return response()->json(['errors' => Helpers::error_processor($validator)], 403);
                     }
 
-                    $items = CategoryLogic::category_products($category_ids, $zone_id, $limit, $offset, $type, $filter, $min_price, $max_price, $rating_count);
+                    $items = CategoryLogic::category_products($category_ids, $zone_id, $limit, $offset, $type, $filter, $min_price, $max_price, $rating_count,$brand_ids);
                     break;
                 default:
                     $items =  [

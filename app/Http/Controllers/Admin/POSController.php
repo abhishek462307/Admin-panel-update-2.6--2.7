@@ -632,6 +632,7 @@ class POSController extends Controller
         $order->original_delivery_charge = isset($address)?$address['delivery_fee']+$extra_charges:0;
         $order->delivery_address = isset($address)?json_encode($address):null;
         $order->checked = 1;
+        $order->zone_id = $store->zone_id;
         $order->schedule_at = now();
         $order->created_at = now();
         $order->updated_at = now();
@@ -853,16 +854,12 @@ class POSController extends Controller
             'password' => bcrypt('password')
         ]);
 
-        try
-        {
-            $mail_status = Helpers::get_mail_status('registration_otp_mail_status_user');
-            if ( config('mail.status') && $mail_status == '1') {
-                Mail::to($request->email)->send(new \App\Mail\CustomerRegistration($request->f_name.' '.$request->l_name,true));
+        try {
+            if (config('mail.status') && $request->email && Helpers::get_mail_status('pos_registration_mail_status_user') == '1') {
+                Mail::to($request->email)->send(new \App\Mail\CustomerRegistrationPOS($request->f_name . ' ' . $request->l_name,$request['email'],'password'));
+                Toastr::success(translate('mail_sent_to_the_user'));
             }
-
-        }
-        catch(\Exception $ex)
-        {
+        } catch (\Exception $ex) {
             info($ex->getMessage());
         }
         Toastr::success(translate('customer_added_successfully'));
